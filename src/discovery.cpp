@@ -51,7 +51,7 @@ void publisher::publish() {
   });
   switch (state_) {
     case internal::publisher_state::CAN_PUBLISH:
-      publish_service();
+      publish_service_unlocked();
       set_state_unlocked(internal::publisher_state::PUBLISH_PENDING);
       break;
     case internal::publisher_state::PUBLISH_PENDING:
@@ -137,7 +137,7 @@ void publisher::client_callback(AvahiClient* client, AvahiClientState state,
   }
 }
 
-void publisher::publish_service() {
+void publisher::publish_service_unlocked() {
   if (!entry_group_) {
     entry_group_ = avahi_entry_group_new(client_, entry_group_callback, this);
     if (!entry_group_) {

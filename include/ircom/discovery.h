@@ -50,7 +50,7 @@ class publisher {
   static void client_callback(AvahiClient* client, AvahiClientState state,
                               void* data);
 
-  void publish_service();
+  void publish_service_unlocked();
   void set_state_unlocked(internal::publisher_state state);
 
   const char* service_name_;
