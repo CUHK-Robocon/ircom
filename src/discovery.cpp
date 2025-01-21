@@ -69,8 +69,8 @@ void publisher::publish() {
 }
 
 void publisher::reset() {
+  std::lock_guard<internal::avahi_mutex> lock(mutex_);
   if (entry_group_) {
-    std::lock_guard<internal::avahi_mutex> lock(mutex_);
     avahi_entry_group_reset(entry_group_);
     set_state_unlocked(internal::publisher_state::CAN_PUBLISH);
   }
