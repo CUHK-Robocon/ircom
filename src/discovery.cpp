@@ -9,7 +9,6 @@
 
 namespace ircom::discovery {
 
-const int DISCOVERY_PROTO = AVAHI_PROTO_INET;
 const char* const DISCOVERY_SERVICE_TYPE = "_ircom._tcp";
 
 publisher::publisher(const char* service_name) : service_name_(service_name) {
@@ -149,8 +148,11 @@ void publisher::publish_service_unlocked() {
         "Avahi entry group is not empty when trying to publish services");
   }
 
+  // Publish over all protocols for maximum coverage. With the default daemon
+  // configuration, both IPv4 and IPv6 records are available over IPv4 queries;
+  // IPv6 records are available over IPv6 queries.
   int ret = avahi_entry_group_add_service(
-      entry_group_, AVAHI_IF_UNSPEC, DISCOVERY_PROTO,
+      entry_group_, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC,
       static_cast<AvahiPublishFlags>(0), service_name_, DISCOVERY_SERVICE_TYPE,
       nullptr, nullptr, SERVICE_PORT, nullptr);
   if (ret == AVAHI_ERR_COLLISION) {
