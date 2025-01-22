@@ -140,10 +140,8 @@ void publisher::client_callback(AvahiClient* client, AvahiClientState state,
 void publisher::publish_service_unlocked() {
   if (!entry_group_) {
     entry_group_ = avahi_entry_group_new(client_, entry_group_callback, this);
-    if (!entry_group_) {
-      avahi_threaded_poll_quit(ev_loop_);
+    if (!entry_group_)
       throw std::runtime_error("Failed to create Avahi entry group");
-    }
   }
 
   if (!avahi_entry_group_is_empty(entry_group_)) {
@@ -161,15 +159,11 @@ void publisher::publish_service_unlocked() {
 
     // NOTE: May use alternative name if needed in the future.
 
-    avahi_threaded_poll_quit(ev_loop_);
-
     throw std::runtime_error(
         "Local service name collision, maybe another process is still "
         "running");
   }
   if (ret < 0) {
-    avahi_threaded_poll_quit(ev_loop_);
-
     throw std::runtime_error(
         (boost::format("Failed to add service to Avahi entry group: %1%") %
          avahi_strerror(ret))
@@ -178,8 +172,6 @@ void publisher::publish_service_unlocked() {
 
   ret = avahi_entry_group_commit(entry_group_);
   if (ret < 0) {
-    avahi_threaded_poll_quit(ev_loop_);
-
     throw std::runtime_error(
         (boost::format("Failed to commit Avahi entry group: %1%") %
          avahi_strerror(ret))
