@@ -5,7 +5,8 @@
 - CMake
 - C++ 20 compiler
 - `avahi-client` and `avahi-common` libraries (`libavahi-client-dev` package for `apt`)
-- Boost
+- Boost (`libboost-all-dev` package for `apt`)
+- spdlog (`libspdlog-dev` package for `apt`)
 
 ## Runtime Requirements
 

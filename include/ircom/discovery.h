@@ -2,9 +2,13 @@
 #define IRCOM_INCLUDE_IRCOM_DISCOVERY_H_
 
 #include <condition_variable>
+#include <cstdint>
 #include <mutex>
+#include <string>
+#include <vector>
 
 #include "avahi-client/client.h"
+#include "avahi-client/lookup.h"
 #include "avahi-client/publish.h"
 #include "avahi-common/thread-watch.h"
 
@@ -62,6 +66,50 @@ class publisher {
   internal::publisher_state state_ =
       internal::publisher_state::PUBLISHER_STARTING;
   std::condition_variable_any state_update_cv_;
+
+  internal::avahi_mutex mutex_;
+};
+
+struct service_info {
+  AvahiIfIndex interface;
+  std::string name;
+  std::string domain;
+
+  std::string addr;
+};
+
+class browser {
+ public:
+  browser();
+  ~browser();
+
+  browser(const browser&) = delete;
+  browser& operator=(const browser&) = delete;
+
+  const service_info& get_latest_service();
+
+ private:
+  static void service_resolver_callback(
+      AvahiServiceResolver* resolver, AvahiIfIndex interface,
+      AvahiProtocol protocol, AvahiResolverEvent event, const char* name,
+      const char* type, const char* domain, const char* host_name,
+      const AvahiAddress* addr, uint16_t port, AvahiStringList* txt,
+      AvahiLookupResultFlags flags, void* data);
+  static void service_browser_callback(
+      AvahiServiceBrowser* b, AvahiIfIndex interface, AvahiProtocol protocol,
+      AvahiBrowserEvent event, const char* name, const char* type,
+      const char* domain, AvahiLookupResultFlags flags, void* data);
+  static void client_callback(AvahiClient* client, AvahiClientState state,
+                              void* data);
+
+  bool has_service_unlocked();
+
+  AvahiThreadedPoll* ev_loop_;
+  AvahiClient* client_;
+  AvahiServiceBrowser* browser_;
+
+  std::vector<service_info> services_;
+  std::condition_variable_any new_service_cv_;
 
   internal::avahi_mutex mutex_;
 };
