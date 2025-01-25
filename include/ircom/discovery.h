@@ -25,10 +25,10 @@ class avahi_mutex {
 };
 
 enum publisher_state {
-  STARTING,
-  CAN_PUBLISH,
-  PUBLISH_PENDING,
-  PUBLISHED,
+  PUBLISHER_STARTING,
+  PUBLISHER_CAN_PUBLISH,
+  PUBLISHER_PUBLISH_PENDING,
+  PUBLISHER_PUBLISHED,
 };
 
 }  // namespace internal
@@ -59,7 +59,8 @@ class publisher {
   AvahiClient* client_;
   AvahiEntryGroup* entry_group_ = nullptr;
 
-  internal::publisher_state state_ = internal::publisher_state::STARTING;
+  internal::publisher_state state_ =
+      internal::publisher_state::PUBLISHER_STARTING;
   std::condition_variable_any state_update_cv_;
 
   internal::avahi_mutex mutex_;

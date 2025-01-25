@@ -44,34 +44,35 @@ publisher::~publisher() {
 void publisher::publish() {
   std::unique_lock<internal::avahi_mutex> lock(mutex_);
   state_update_cv_.wait(lock, [&]() {
-    return state_ == internal::publisher_state::CAN_PUBLISH ||
-           state_ == internal::publisher_state::PUBLISH_PENDING ||
-           state_ == internal::publisher_state::PUBLISHED;
+    return state_ == internal::publisher_state::PUBLISHER_CAN_PUBLISH ||
+           state_ == internal::publisher_state::PUBLISHER_PUBLISH_PENDING ||
+           state_ == internal::publisher_state::PUBLISHER_PUBLISHED;
   });
   switch (state_) {
-    case internal::publisher_state::CAN_PUBLISH:
+    case internal::publisher_state::PUBLISHER_CAN_PUBLISH:
       publish_service_unlocked();
-      set_state_unlocked(internal::publisher_state::PUBLISH_PENDING);
+      set_state_unlocked(internal::publisher_state::PUBLISHER_PUBLISH_PENDING);
       break;
-    case internal::publisher_state::PUBLISH_PENDING:
+    case internal::publisher_state::PUBLISHER_PUBLISH_PENDING:
       // Another call to publish is publishing already.
-      // Do nothing and directly wait for state to become PUBLISHED.
+      // Do nothing and directly wait for state to become PUBLISHER_PUBLISHED.
       break;
-    case internal::publisher_state::PUBLISHED:
+    case internal::publisher_state::PUBLISHER_PUBLISHED:
       return;
     default:
       throw std::logic_error("Unreachable branch");
   }
   // TODO: What if an error occurred or entry group is resetted while waiting?
-  state_update_cv_.wait(
-      lock, [&]() { return state_ == internal::publisher_state::PUBLISHED; });
+  state_update_cv_.wait(lock, [&]() {
+    return state_ == internal::publisher_state::PUBLISHER_PUBLISHED;
+  });
 }
 
 void publisher::reset() {
   std::lock_guard<internal::avahi_mutex> lock(mutex_);
   if (entry_group_) {
     avahi_entry_group_reset(entry_group_);
-    set_state_unlocked(internal::publisher_state::CAN_PUBLISH);
+    set_state_unlocked(internal::publisher_state::PUBLISHER_CAN_PUBLISH);
   }
 }
 
@@ -81,7 +82,7 @@ void publisher::entry_group_callback(AvahiEntryGroup* entry_group,
 
   switch (state) {
     case AVAHI_ENTRY_GROUP_ESTABLISHED:
-      srv->set_state_unlocked(internal::publisher_state::PUBLISHED);
+      srv->set_state_unlocked(internal::publisher_state::PUBLISHER_PUBLISHED);
       break;
 
     case AVAHI_ENTRY_GROUP_COLLISION:
@@ -111,11 +112,11 @@ void publisher::client_callback(AvahiClient* client, AvahiClientState state,
   publisher* srv = static_cast<publisher*>(data);
 
   if (state != AVAHI_CLIENT_S_RUNNING)
-    srv->set_state_unlocked(internal::publisher_state::STARTING);
+    srv->set_state_unlocked(internal::publisher_state::PUBLISHER_STARTING);
 
   switch (state) {
     case AVAHI_CLIENT_S_RUNNING:
-      srv->set_state_unlocked(internal::publisher_state::CAN_PUBLISH);
+      srv->set_state_unlocked(internal::publisher_state::PUBLISHER_CAN_PUBLISH);
       break;
 
     case AVAHI_CLIENT_S_COLLISION:
