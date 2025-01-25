@@ -72,7 +72,6 @@ class publisher {
 
 struct service_info {
   AvahiIfIndex interface;
-  std::string name;
   std::string domain;
 
   std::string addr;
@@ -80,7 +79,7 @@ struct service_info {
 
 class browser {
  public:
-  browser();
+  explicit browser(const char* target_service_name);
   ~browser();
 
   browser(const browser&) = delete;
@@ -103,6 +102,8 @@ class browser {
                               void* data);
 
   bool has_service_unlocked();
+
+  const char* target_service_name_;
 
   AvahiThreadedPoll* ev_loop_;
   AvahiClient* client_;

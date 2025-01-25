@@ -38,7 +38,8 @@ class server {
 
 class client {
  public:
-  client() = default;
+  explicit client(const char* target_service_name)
+      : browser_(target_service_name) {};
 
   client(const client&) = delete;
   client& operator=(const client&) = delete;

@@ -192,7 +192,8 @@ void publisher::set_state_unlocked(internal::publisher_state state) {
   state_update_cv_.notify_all();
 }
 
-browser::browser() {
+browser::browser(const char* target_service_name)
+    : target_service_name_(target_service_name) {
   ev_loop_ = avahi_threaded_poll_new();
   if (!ev_loop_) throw std::runtime_error("Failed to create Avahi event loop");
 
@@ -256,6 +257,7 @@ void browser::service_resolver_callback(
 
   switch (event) {
     case AVAHI_RESOLVER_FOUND:
+      if (std::strcmp(name, self->target_service_name_) != 0) break;
       if (std::strcmp(type, DISCOVERY_SERVICE_TYPE) != 0) break;
       if (protocol != DISCOVERY_RESOLVE_ADDR_PROTO) break;
       if (port != SERVICE_PORT) break;
@@ -265,7 +267,6 @@ void browser::service_resolver_callback(
 
       self->services_.push_back({
           .interface = interface,
-          .name = name,
           .domain = domain,
           .addr = addr_cstr,
       });
@@ -318,13 +319,13 @@ void browser::service_browser_callback(
       break;
 
     case AVAHI_BROWSER_REMOVE:
+      if (std::strcmp(name, self->target_service_name_) != 0) break;
       if (std::strcmp(type, DISCOVERY_SERVICE_TYPE) != 0) break;
       if (protocol != DISCOVERY_RESOLVE_ADDR_PROTO) break;
 
       for (auto it = self->services_.begin(); it != self->services_.end();) {
         const service_info& service = *it;
-        if (service.interface == interface && service.name == name &&
-            service.domain == domain) {
+        if (service.interface == interface && service.domain == domain) {
           it = self->services_.erase(it);
           spdlog::debug(
               "Removed service (name: {}, interface: {}, domain: {}, address: "
