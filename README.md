@@ -11,3 +11,7 @@
 ## Runtime Requirements
 
 - A running Avahi daemon (`avahi-daemon` package for `apt`)
+
+## Known Issues
+
+- Service updates (name, TXT records, etc changes) are not handled.
