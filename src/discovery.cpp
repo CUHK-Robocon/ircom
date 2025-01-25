@@ -8,6 +8,7 @@
 #include "avahi-common/error.h"
 #include "boost/format.hpp"
 #include "ircom/config.h"
+#include "spdlog/spdlog.h"
 
 namespace ircom::discovery {
 
@@ -271,11 +272,22 @@ void browser::service_resolver_callback(
 
       self->new_service_cv_.notify_all();
 
+      spdlog::debug(
+          "Found new service (name: {}, interface: {}, domain: {}, address: "
+          "{})",
+          name, interface, domain, addr_cstr);
+
       break;
 
     case AVAHI_RESOLVER_FAILURE:
-      // TODO: Don't quit, check the error type as the failure may not be fatal,
-      // e.g. when querying INET record over INET6.
+      // The failure may not be fatal, e.g. when querying INET record over
+      // INET6.
+      spdlog::debug(
+          "Cannot resolve a `{}` service (`{}` in domain `{}`) over protocol "
+          "{}, skipping: {}",
+          type, name, domain, protocol,
+          avahi_strerror(
+              avahi_client_errno(avahi_service_resolver_get_client(resolver))));
       break;
   }
 
@@ -314,6 +326,10 @@ void browser::service_browser_callback(
         if (service.interface == interface && service.name == name &&
             service.domain == domain) {
           it = self->services_.erase(it);
+          spdlog::debug(
+              "Removed service (name: {}, interface: {}, domain: {}, address: "
+              "{})",
+              name, interface, domain, service.addr);
         } else {
           ++it;
         }
