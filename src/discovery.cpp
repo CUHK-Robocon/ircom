@@ -257,8 +257,6 @@ void browser::service_resolver_callback(
 
   switch (event) {
     case AVAHI_RESOLVER_FOUND:
-      if (std::strcmp(name, self->target_service_name_) != 0) break;
-      if (std::strcmp(type, DISCOVERY_SERVICE_TYPE) != 0) break;
       if (protocol != DISCOVERY_RESOLVE_ADDR_PROTO) break;
       if (port != SERVICE_PORT) break;
 
@@ -303,6 +301,9 @@ void browser::service_browser_callback(
 
   switch (event) {
     case AVAHI_BROWSER_NEW:
+      if (std::strcmp(name, self->target_service_name_) != 0) break;
+      if (std::strcmp(type, DISCOVERY_SERVICE_TYPE) != 0) break;
+
       // Address type filter specified here.
       // Resolver is freed in the callback.
       if (!avahi_service_resolver_new(avahi_service_browser_get_client(b),
@@ -316,6 +317,7 @@ void browser::service_browser_callback(
                  avahi_client_errno(avahi_service_browser_get_client(b))))
                 .str());
       }
+
       break;
 
     case AVAHI_BROWSER_REMOVE:
