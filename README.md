@@ -12,6 +12,7 @@
 
 - A running Avahi daemon (`avahi-daemon` package for `apt`)
 
-## Known Issues
+## Known Issues/Limitation
 
 - Service updates (name, TXT records, etc changes) are not handled.
+- Only one-to-one communication is implemented for now.
