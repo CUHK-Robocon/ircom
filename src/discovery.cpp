@@ -241,7 +241,7 @@ browser::~browser() {
   avahi_threaded_poll_free(ev_loop_);
 }
 
-const service_info& browser::get_latest_service() {
+service_info browser::get_latest_service() {
   std::unique_lock<internal::avahi_mutex> lock(mutex_);
   new_service_cv_.wait(lock, [&]() { return has_service_unlocked(); });
   return services_.back();

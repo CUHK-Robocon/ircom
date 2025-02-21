@@ -85,7 +85,7 @@ class browser {
   browser(const browser&) = delete;
   browser& operator=(const browser&) = delete;
 
-  const service_info& get_latest_service();
+  service_info get_latest_service();
 
  private:
   static void service_resolver_callback(
