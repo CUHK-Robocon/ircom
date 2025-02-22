@@ -3,6 +3,7 @@
 
 #include <condition_variable>
 #include <cstdint>
+#include <exception>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -77,6 +78,11 @@ struct service_info {
   std::string addr;
 };
 
+class closed_exception : public std::exception {
+ public:
+  const char* what() const noexcept override { return "Object closed"; }
+};
+
 class browser {
  public:
   explicit browser(const char* target_service_name);
@@ -86,6 +92,8 @@ class browser {
   browser& operator=(const browser&) = delete;
 
   service_info get_latest_service();
+
+  void close();
 
  private:
   static void service_resolver_callback(
@@ -111,6 +119,8 @@ class browser {
 
   std::vector<service_info> services_;
   std::condition_variable_any new_service_cv_;
+
+  bool is_closed_ = false;
 
   internal::avahi_mutex mutex_;
 };

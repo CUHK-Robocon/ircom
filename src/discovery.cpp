@@ -243,8 +243,24 @@ browser::~browser() {
 
 service_info browser::get_latest_service() {
   std::unique_lock<internal::avahi_mutex> lock(mutex_);
-  new_service_cv_.wait(lock, [&]() { return has_service_unlocked(); });
+  new_service_cv_.wait(lock,
+                       [&]() { return has_service_unlocked() || is_closed_; });
+  if (is_closed_) throw closed_exception();
   return services_.back();
+}
+
+void browser::close() {
+  {
+    std::unique_lock<internal::avahi_mutex> lock(mutex_);
+    is_closed_ = true;
+  }
+  // Notify all CVs.
+  new_service_cv_.notify_all();
+
+  // Should be placed after `is_closed_` is set to true, such that existing CVs
+  // are all waken up to handle closure while new waits on the CVs will return
+  // immediately.
+  avahi_threaded_poll_stop(ev_loop_);
 }
 
 void browser::service_resolver_callback(
