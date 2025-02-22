@@ -29,5 +29,7 @@ target_link_libraries(ircom
     spdlog::spdlog_header_only
 )
 
-add_executable(ircom_test test/main.cpp)
-target_link_libraries(ircom_test ircom)
+add_executable(ircom_test_server test/server.cpp)
+target_link_libraries(ircom_test_server ircom)
+add_executable(ircom_test_client test/client.cpp)
+target_link_libraries(ircom_test_client ircom)
