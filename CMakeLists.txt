@@ -15,6 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(ircom STATIC
     src/discovery.cpp
     src/ircom.cpp
+    src/packet.cpp
 )
 target_include_directories(ircom
     PUBLIC

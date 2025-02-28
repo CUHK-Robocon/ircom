@@ -1,11 +1,84 @@
 #include "ircom/ircom.h"
 
+#include <array>
 #include <chrono>
+#include <cstdint>
+#include <vector>
 
 #include "boost/system/system_error.hpp"
 #include "spdlog/spdlog.h"
 
 namespace ircom {
+
+void update_keeper::send_update(const packet::payload& pl) {
+  boost::asio::co_spawn(sock_.get_executor(), flush_queue(pl),
+                        boost::asio::detached);
+}
+
+packet::payload update_keeper::latest_update() {
+  std::lock_guard<std::mutex> lock(latest_update_mtx_);
+  return latest_update_;
+}
+
+boost::asio::awaitable<void> update_keeper::flush_queue(packet::payload pl) {
+  if (!sock_.is_open()) {
+    // To prevent updates from the last connection to be send to the new
+    // connection.
+    update_buf_.clear();
+    co_return;
+  }
+
+  bool is_first = update_buf_.empty();
+
+  if (update_buf_.size() == update_buf_.capacity()) {
+    // Such that the active write loop knows whether to pop front or not.
+    update_buf_rotated_ = true;
+    spdlog::warn(
+        "Outbound update buffer rotating, too many updates being dispatched");
+  }
+  update_buf_.push_back(pl);
+
+  if (!is_first) co_return;
+
+  do {
+    // Make a copy here to prevent dangling reference/torn read as circular
+    // buffer overwrites the front.
+    packet::payload front = update_buf_.front();
+
+    std::vector<std::uint8_t> payload_bytes;
+    front.serialize(payload_bytes);
+
+    std::array<boost::asio::const_buffer, 3> bufs = {
+        packet::HEADER_BUF,
+        boost::asio::buffer(payload_bytes),
+        packet::FOOTER_BUF,
+    };
+
+    co_await boost::asio::async_write(sock_, bufs, boost::asio::use_awaitable);
+
+    // If rotated, don't pop front as the front is no longer the same.
+    // Reset "rotated" flag afterwards.
+    if (!update_buf_rotated_) update_buf_.pop_front();
+    update_buf_rotated_ = false;
+  } while (!update_buf_.empty());
+}
+
+boost::asio::awaitable<void> update_keeper::handle_updates() {
+  while (true) {
+    std::uint8_t buf[5 + 24 + 3];
+    co_await boost::asio::async_read(sock_,
+                                     boost::asio::buffer(buf, 5 + 24 + 3),
+                                     boost::asio::use_awaitable);
+
+    packet::payload pl;
+    pl.deserialize(buf + 5);
+
+    {
+      std::lock_guard<std::mutex> lock(latest_update_mtx_);
+      latest_update_ = pl;
+    }
+  }
+}
 
 server::server(const char* service_name) : publisher_(service_name) {
   io_ctx_thread_ = std::thread(&server::io_ctx_thread_f, this);
@@ -20,14 +93,11 @@ server::~server() {
   io_ctx_thread_.join();
 }
 
-boost::asio::awaitable<void> server::handle_conn() {
-  while (true) {
-    // TODO: Read and process packet.
-
-    boost::asio::steady_timer timer(io_ctx_, boost::asio::chrono::seconds(1));
-    co_await timer.async_wait(boost::asio::use_awaitable);
-  }
+void server::send_update(const packet::payload& pl) {
+  udkeeper_.send_update(pl);
 }
+
+packet::payload server::latest_update() { return udkeeper_.latest_update(); }
 
 boost::asio::awaitable<void> server::handler() {
   // Indeed, connections can reach the backlogs after `acceptor_` is opened.
@@ -56,7 +126,7 @@ boost::asio::awaitable<void> server::handler() {
                    remote_endpoint.port());
 
       try {
-        co_await handle_conn();
+        co_await udkeeper_.handle_updates();
       } catch (const boost::system::system_error& err) {
         if (err.code() == boost::asio::error::operation_aborted ||
             err.code() == boost::asio::error::eof && shutdown_issued_) {
@@ -99,14 +169,11 @@ client::~client() {
   io_ctx_thread_.join();
 }
 
-boost::asio::awaitable<void> client::handle_conn() {
-  while (true) {
-    // TODO: Read and process packet.
-
-    boost::asio::steady_timer timer(io_ctx_, boost::asio::chrono::seconds(1));
-    co_await timer.async_wait(boost::asio::use_awaitable);
-  }
+void client::send_update(const packet::payload& pl) {
+  udkeeper_.send_update(pl);
 }
+
+packet::payload client::latest_update() { return udkeeper_.latest_update(); }
 
 boost::asio::awaitable<void> client::connect() {
   try {
@@ -144,6 +211,8 @@ boost::asio::awaitable<void> client::connect() {
         should_retry = true;
       }
       if (should_retry) {
+        sock_.close();
+
         // Retry cooldown.
         boost::asio::steady_timer timer(io_ctx_,
                                         boost::asio::chrono::seconds(1));
@@ -153,7 +222,7 @@ boost::asio::awaitable<void> client::connect() {
       }
 
       try {
-        co_await handle_conn();
+        co_await udkeeper_.handle_updates();
       } catch (const boost::system::system_error& err) {
         if (err.code() == boost::asio::error::operation_aborted ||
             err.code() == boost::asio::error::eof && shutdown_issued_) {
